@@ -1,23 +1,29 @@
-version: '3.3'
+version: '3.8'
 
 services:
   bot:
-    image: "${BOT_IMAGE_NAME:-tg_bot-image}"
-    container_name: "${BOT_CONTAINER_NAME:-tg_bot-container}"
-    stop_signal: SIGINT
     build:
       context: .
-    working_dir: "/usr/src/app/${BOT_NAME:-tg_bot}"
-    volumes:
-    - .:/usr/src/app/${BOT_NAME:-tg_bot}
-    command: python3 -m bot
+    container_name: diet_ai_bot
     restart: always
+    stop_signal: SIGINT
+    # Якщо головний файл bot.py, залишаємо так
+    command: python bot.py
     env_file:
       - ".env"
-    networks:
-    - tg_bot
-
+    volumes:
+      # Зберігаємо тільки базу даних, щоб при оновленні коду дані не зникали
+      - ./tgbot/models:/usr/src/app/tgbot/models
+    # Порти зазвичай не потрібні для Telegram ботів на long polling,
+    # але якщо використовуєш webhooks — залиш
+    ports:
+      - "80:8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
-  tg_bot:
-    driver: bridge
+  default:
+    name: tg_bot_net

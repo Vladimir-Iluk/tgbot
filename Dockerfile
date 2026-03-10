@@ -1,8 +1,17 @@
-FROM python:3.9-buster
-ENV BOT_NAME=$BOT_NAME
+FROM python:3.11-slim-buster
 
-WORKDIR /usr/src/app/"${BOT_NAME:-tg_bot}"
+# Налаштування середовища для виводу логів без затримок
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-COPY requirements.txt /usr/src/app/"${BOT_NAME:-tg_bot}"
-RUN pip install -r /usr/src/app/"${BOT_NAME:-tg_bot}"/requirements.txt
-COPY . /usr/src/app/"${BOT_NAME:-tg_bot}"
+WORKDIR /usr/src/app
+
+# Копіюємо та встановлюємо залежності
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копіюємо весь код проекту
+COPY . .
+
+# Команда запуску за замовчуванням
+CMD ["python", "bot.py"]

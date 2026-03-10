@@ -3,6 +3,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.utils.markdown import hcode
 
 
+
 async def bot_echo(message: types.Message):
     text = [
         "Эхо без состояния.",
