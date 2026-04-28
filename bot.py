@@ -162,6 +162,7 @@ async def main():
         await dp.storage.close()
         await dp.storage.wait_closed()
         await webhook_runner.cleanup()
+        await webhook_runner.cleanup()
 
         # Закриваємо з'єднання з БД, якщо такий метод передбачений
         if hasattr(db, 'close'):
