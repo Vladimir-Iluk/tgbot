@@ -155,13 +155,18 @@ class Database:
         user = await self.get_user(user_id)
         now = datetime.now()
         w, h, a = float(weight), int(height), int(age)
+
+        # Розрахунок BMR та ліміту калорій
         if gender == "Чоловік":
             bmr = (10 * w) + (6.25 * h) - (5 * a) + 5
         else:
             bmr = (10 * w) + (6.25 * h) - (5 * a) - 161
         kcal_limit = int(bmr * float(activity))
-        if goal == "Схуднути": kcal_limit -= 300
-        elif goal == "Набрати масу": kcal_limit += 300
+
+        if goal == "Схуднути":
+            kcal_limit -= 300
+        elif goal == "Набрати масу":
+            kcal_limit += 300
 
         if not user:
             premium_until = (now + timedelta(days=7)).isoformat()
@@ -170,11 +175,24 @@ class Database:
             premium_until = user['premium_until']
             reg_date = user['registration_date']
 
+        # ВИПРАВЛЕННЯ: замість REPLACE використовуємо ON CONFLICT
         await self.conn.execute("""
-            INSERT OR REPLACE INTO users 
-            (user_id, gender, age, current_weight, height, activity, daily_kcal_limit, goal, target_weight, daily_budget, registration_date, premium_until) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, gender, age, weight, height, activity, kcal_limit, goal, target_weight, budget, reg_date, premium_until))
+                                INSERT INTO users
+                                (user_id, gender, age, current_weight, height, activity, daily_kcal_limit, goal,
+                                 target_weight, daily_budget, registration_date, premium_until)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id) DO
+                                UPDATE SET
+                                    gender = excluded.gender,
+                                    age = excluded.age,
+                                    current_weight = excluded.current_weight,
+                                    height = excluded.height,
+                                    activity = excluded.activity,
+                                    daily_kcal_limit = excluded.daily_kcal_limit,
+                                    goal = excluded.goal,
+                                    target_weight = excluded.target_weight,
+                                    daily_budget = excluded.daily_budget
+                                """, (user_id, gender, age, weight, height, activity, kcal_limit, goal, target_weight,
+                                      budget, reg_date, premium_until))
         await self.conn.commit()
 
     async def get_user(self, user_id: int):

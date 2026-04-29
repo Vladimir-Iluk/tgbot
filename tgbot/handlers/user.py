@@ -13,7 +13,7 @@ from tgbot.keyboards.reply import get_gender_kb, get_skip_kb, get_goal_kb, get_m
     get_cancel_kb, get_activity_kb
 from tgbot.services.gemini_service import send_photo_to_gemini, send_text_to_gemini
 from tgbot.config import Config
-from tgbot.misc.states import RegistrationStates
+from tgbot.misc.states import RegistrationStates, EditProfileStates
 from tgbot.misc.premium import check_premium
 
 meal_cb = CallbackData("meal", "action", "id")
@@ -85,22 +85,20 @@ async def process_settings_change(callback_query: CallbackQuery, state: FSMConte
 
     if action == "change_goal":
         await callback_query.message.answer("Яка ваша нова ціль?", reply_markup=get_goal_kb())
-        await RegistrationStates.waiting_for_goal.set()
+        await EditProfileStates.waiting_for_new_goal.set()
 
     elif action == "change_weight":
         await callback_query.message.answer("Введіть вашу нову вагу (кг):", reply_markup=ReplyKeyboardRemove())
-        await RegistrationStates.waiting_for_current_weight.set()
+        await EditProfileStates.waiting_for_new_weight.set()
 
     elif action == "change_budget":
         await callback_query.message.answer("Вкажіть новий денний бюджет (грн):", reply_markup=ReplyKeyboardRemove())
-        await RegistrationStates.waiting_for_budget.set()
+        await EditProfileStates.waiting_for_new_budget.set()
 
     elif action == "full_reset":
-        await callback_query.message.answer("Розпочнемо реєстрацію заново. Оберіть стать:",
-                                            reply_markup=get_gender_kb())
+        await callback_query.message.answer("Розпочнемо реєстрацію заново. Оберіть стать:", reply_markup=get_gender_kb())
         await RegistrationStates.waiting_for_gender.set()
 
-    # Обов'язково відповідаємо на callback, щоб прибрати "годинник" на кнопці
     await callback_query.answer()
 
 
@@ -164,7 +162,7 @@ def compress_image(image_bytes: bytes) -> bytes:
 
 async def user_settings(message: Message):
     db = message.bot.get('db')
-    user = await db.get_user(message.from_user.id)
+    user = await db.get_user(message.chat.id)
     if not user:
         return await user_start(message)
 
@@ -653,6 +651,74 @@ async def process_open_settings(callback_query: CallbackQuery):
     await callback_query.answer()
 
 
+async def edit_single_weight(message: Message, state: FSMContext):
+    text = message.text.replace(',', '.').strip()
+    clean_text = "".join(re.findall(r"[\d.]", text))
+
+    try:
+        new_weight = float(clean_text)
+        if not (30 <= new_weight <= 300):
+            return await message.reply("Вкажіть реальну вагу від 30 до 300 кг.")
+    except ValueError:
+        return await message.reply("Будь ласка, введіть число (наприклад: 75).")
+
+    db = message.bot.get('db')
+    user_id = message.from_user.id
+    user = dict(await db.get_user(user_id))
+
+    # Зберігаємо всі старі дані, замінюємо лише вагу
+    await db.add_user(
+        user_id=user_id, gender=user['gender'], age=user['age'],
+        weight=new_weight, height=user['height'], activity=user['activity'],
+        goal=user['goal'], target_weight=user['target_weight'], budget=user['daily_budget']
+    )
+
+    await state.finish()
+    await message.reply("✅ <b>Вагу успішно оновлено!</b>\nВашу норму калорій було перераховано.",
+                        reply_markup=get_main_menu_kb(), parse_mode="HTML")
+    await user_profile(message)
+
+
+async def edit_single_goal(message: Message, state: FSMContext):
+    new_goal = message.text
+    db = message.bot.get('db')
+    user_id = message.from_user.id
+    user = dict(await db.get_user(user_id))
+
+    await db.add_user(
+        user_id=user_id, gender=user['gender'], age=user['age'],
+        weight=user['current_weight'], height=user['height'], activity=user['activity'],
+        goal=new_goal, target_weight=user['target_weight'], budget=user['daily_budget']
+    )
+
+    await state.finish()
+    await message.reply("✅ <b>Ціль успішно оновлено!</b>\nВашу норму калорій було перераховано.",
+                        reply_markup=get_main_menu_kb(), parse_mode="HTML")
+    await user_profile(message)
+
+
+async def edit_single_budget(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        return await message.reply("Введіть суму числом (наприклад: 500).")
+
+    new_budget = int(message.text)
+    if not (50 <= new_budget <= 10000):
+        return await message.reply("Введіть реальну суму денного бюджету (від 50 до 10 000 грн).")
+
+    db = message.bot.get('db')
+    user_id = message.from_user.id
+    user = dict(await db.get_user(user_id))
+
+    await db.add_user(
+        user_id=user_id, gender=user['gender'], age=user['age'],
+        weight=user['current_weight'], height=user['height'], activity=user['activity'],
+        goal=user['goal'], target_weight=user['target_weight'], budget=new_budget
+    )
+
+    await state.finish()
+    await message.reply("✅ <b>Денний бюджет оновлено!</b>", reply_markup=get_main_menu_kb(), parse_mode="HTML")
+    await user_profile(message)
+
 def register_user(dp: Dispatcher):
     # Список кнопок, які не повинні сприйматися як текстовий запит до Gemini
     main_menu_buttons = [
@@ -660,6 +726,8 @@ def register_user(dp: Dispatcher):
         "📊 Статистика за місяць", "👤 Мій профіль", "💎 Premium", "❓ Допомога",
         "Скасувати ❌", "Пропустити ➡️", "⬅️ Назад", "Мій профіль", "Допомога"
     ]
+
+
 
     # --- 1. СКАСУВАННЯ (Найвищий пріоритет) ---
     dp.register_message_handler(cancel_handler, commands=["cancel"], state="*")
@@ -701,6 +769,9 @@ def register_user(dp: Dispatcher):
     dp.register_message_handler(set_goal, state=RegistrationStates.waiting_for_goal)
     dp.register_message_handler(set_target_weight, state=RegistrationStates.waiting_for_target_weight)
     dp.register_message_handler(set_budget, state=RegistrationStates.waiting_for_budget)
+    dp.register_message_handler(edit_single_weight, state=EditProfileStates.waiting_for_new_weight)
+    dp.register_message_handler(edit_single_goal, state=EditProfileStates.waiting_for_new_goal)
+    dp.register_message_handler(edit_single_budget, state=EditProfileStates.waiting_for_new_budget)
 
     # --- 5. КОНТЕНТ (АНАЛІЗ) ---
     dp.register_message_handler(user_send_photo, content_types=ContentType.PHOTO, state="*")

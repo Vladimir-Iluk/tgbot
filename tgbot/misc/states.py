@@ -13,3 +13,8 @@ class RegistrationStates(StatesGroup):
 
 class AdminStates(StatesGroup):
     waiting_for_user_id = State()
+
+class EditProfileStates(StatesGroup):
+    waiting_for_new_goal = State()
+    waiting_for_new_weight = State()
+    waiting_for_new_budget = State()
