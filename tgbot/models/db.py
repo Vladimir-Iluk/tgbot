@@ -149,7 +149,22 @@ class Database:
                 "meals_count": res['count'] if res['count'] else 0
             }
 
-    # --- Решта методів без змін ---
+    async def add_referral_premium(self, user_id: int, days: int):
+        await self.set_premium(user_id, days)
+
+    async def get_user_full_info(self, user_id: int):
+        user = await self.get_user(user_id)
+        if not user: return None
+
+        today = datetime.now().strftime('%Y-%m-%d 00:00:00')
+        async with self.conn.execute(
+                "SELECT SUM(calories) FROM meals WHERE user_id = ? AND created_at >= ? AND confirmed = 1",
+                (user_id, today)
+        ) as cursor:
+            cal_row = await cursor.fetchone()
+            today_cal = cal_row[0] if cal_row[0] else 0
+
+        return {"info": dict(user), "today_calories": today_cal}
 
     async def add_user(self, user_id, gender, age, weight, height, activity, goal, target_weight, budget):
         user = await self.get_user(user_id)
@@ -199,6 +214,41 @@ class Database:
         async with self.conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
             return await cursor.fetchone()
 
+    async def get_inactive_non_premium_users(self, days: int):
+        target_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        now = datetime.now().isoformat()
+        # Логіка: шукаємо в логах останню активність. Якщо вона була раніше target_date і юзер не преміум
+        async with self.conn.execute("""
+                                     SELECT u.user_id
+                                     FROM users u
+                                              LEFT JOIN (SELECT user_id, MAX(created_at) as last_seen
+                                                         FROM logs
+                                                         GROUP BY user_id) l ON u.user_id = l.user_id
+                                     WHERE (l.last_seen < ? OR l.last_seen IS NULL)
+                                       AND (u.premium_until IS NULL OR u.premium_until < ?)
+                                     """, (target_date, now)) as cursor:
+            return [row[0] for row in await cursor.fetchall()]
+
+    async def get_inactive_users(self, days: int):
+        target_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        async with self.conn.execute("""
+                                     SELECT u.user_id
+                                     FROM users u
+                                              LEFT JOIN (SELECT user_id, MAX(created_at) as last_seen
+                                                         FROM logs
+                                                         GROUP BY user_id) l ON u.user_id = l.user_id
+                                     WHERE (l.last_seen < ? OR l.last_seen IS NULL)
+                                     """, (target_date,)) as cursor:
+            return [row[0] for row in await cursor.fetchall()]
+
+    async def check_and_give_gift_premium(self, user_id: int):
+        user = await self.get_user(user_id)
+        if user and not user.get('gift_received', 0):
+            await self.set_premium(user_id, 3)
+            await self.conn.execute("UPDATE users SET gift_received = 1 WHERE user_id = ?", (user_id,))
+            await self.conn.commit()
+            return True
+        return False
     async def set_premium(self, user_id: int, days: int):
         user = await self.get_user(user_id)
         now, start_date = datetime.now(), datetime.now()
@@ -215,6 +265,17 @@ class Database:
         async with self.conn.execute("SELECT 1 FROM used_donations WHERE donation_id = ?", (donation_id,)) as c:
             return await c.fetchone() is not None
 
+    async def get_active_premium_users_with_settings(self, time_of_day: str):
+        column = "morning_motivation" if time_of_day == "morning" else "evening_motivation"
+        now = datetime.now().isoformat()
+
+        # Вибираємо тільки тих, у кого активний преміум ТА увімкнене відповідне налаштування
+        async with self.conn.execute(f"""
+            SELECT user_id FROM users 
+            WHERE premium_until > ? AND {column} = 1
+        """, (now,)) as cursor:
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
     async def mark_donation_used(self, donation_id: str):
         await self.conn.execute("INSERT INTO used_donations (donation_id) VALUES (?)", (donation_id,))
         await self.conn.commit()
@@ -228,6 +289,15 @@ class Database:
             rows = await c.fetchall()
             return [row[0] for row in rows]
 
+    async def get_premium_ending_users(self):
+        """Повертає ID користувачів, у яких преміум закінчується через 1-2 дні"""
+        now = datetime.now()
+        end_window = (now + timedelta(days=2)).isoformat()
+        async with self.conn.execute(
+                "SELECT user_id FROM users WHERE premium_until > ? AND premium_until <= ?",
+                (now.isoformat(), end_window)
+        ) as cursor:
+            return [row[0] for row in await cursor.fetchall()]
     async def get_advanced_stats(self):
         today = datetime.now().date().isoformat()
         now = datetime.now().isoformat()

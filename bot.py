@@ -18,6 +18,10 @@ from tgbot.services.backup import scheduled_backup
 from tgbot.services.scheduler import send_daily_motivation, send_premium_reminders, send_inactivity_reminders
 from tgbot.handlers.payments import register_payments
 from tgbot.services.wayforpay import process_wayforpay_callback
+from tgbot.filters.admin import AdminFilter
+from tgbot.filters.premium import PremiumFilter
+from tgbot.filters.registered import RegisteredFilter
+from tgbot.filters.private import IsPrivateFilter
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,9 @@ def register_all_middlewares(dp, config, db):
 
 def register_all_filters(dp):
     dp.filters_factory.bind(AdminFilter)
+    dp.filters_factory.bind(PremiumFilter)
+    dp.filters_factory.bind(RegisteredFilter)
+    dp.filters_factory.bind(IsPrivateFilter)
 
 
 def register_all_handlers(dp):
@@ -63,7 +70,7 @@ async def on_startup(dp: Dispatcher):
     scheduler = AsyncIOScheduler(timezone="Europe/Kyiv")
 
     # Ранкова мотивація о 08:30 (для Premium)
-    scheduler.add_job(send_daily_motivation, "cron", hour=8, minute=30, args=(bot, db, "morning"))
+    scheduler.add_job(send_daily_motivation, "cron", hour=8, minute=5, args=(bot, db, "morning"))
 
     scheduler.add_job(send_inactivity_reminders, "cron", hour=14, minute=0, args=(bot, db))
     # Вечірня мотивація о 23:18 (для Premium)

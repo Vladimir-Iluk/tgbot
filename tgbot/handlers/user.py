@@ -18,6 +18,7 @@ from tgbot.misc.premium import check_premium
 
 meal_cb = CallbackData("meal", "action", "id")
 
+
 # --- Реєстрація та Старт ---
 async def user_start(message: Message):
     db = message.bot.get('db')
@@ -25,17 +26,11 @@ async def user_start(message: Message):
 
     # 1. Обробка реферального посилання (тільки для нових користувачів)
     if not user:
-        # Отримуємо аргументи після /start (наприклад: /start 12345678)
         args = message.get_args()
         if args and args.isdigit():
             referrer_id = int(args)
-
-            # Перевіряємо, щоб користувач не запросив сам себе
             if referrer_id != message.from_user.id:
-                # Нараховуємо 3 дні Premium тому, хто запросив
                 await db.add_referral_premium(referrer_id, 3)
-
-                # Надсилаємо сповіщення запрошуючому
                 try:
                     await message.bot.send_message(
                         referrer_id,
@@ -96,7 +91,8 @@ async def process_settings_change(callback_query: CallbackQuery, state: FSMConte
         await EditProfileStates.waiting_for_new_budget.set()
 
     elif action == "full_reset":
-        await callback_query.message.answer("Розпочнемо реєстрацію заново. Оберіть стать:", reply_markup=get_gender_kb())
+        await callback_query.message.answer("Розпочнемо реєстрацію заново. Оберіть стать:",
+                                            reply_markup=get_gender_kb())
         await RegistrationStates.waiting_for_gender.set()
 
     await callback_query.answer()
@@ -104,7 +100,6 @@ async def process_settings_change(callback_query: CallbackQuery, state: FSMConte
 
 async def process_referral_menu(callback_query: CallbackQuery):
     bot_info = await callback_query.bot.get_me()
-    # Генеруємо посилання: t.me/bot_name?start=user_id
     referral_link = f"https://t.me/{bot_info.username}?start={callback_query.from_user.id}"
 
     ref_text = (
@@ -115,7 +110,6 @@ async def process_referral_menu(callback_query: CallbackQuery):
         "<i>(Натисніть на посилання, щоб скопіювати)</i>"
     )
 
-    # Створимо кнопку "Поділитися", щоб було зручніше
     share_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton("🚀 Поділитися з другом",
                              switch_inline_query=f"\nПривіт! Раджу цього AI-дієтолога: {referral_link}")
@@ -123,6 +117,7 @@ async def process_referral_menu(callback_query: CallbackQuery):
 
     await callback_query.message.answer(ref_text, reply_markup=share_kb, parse_mode="HTML")
     await callback_query.answer()
+
 
 async def about_help(message: Message):
     about_text = (
@@ -151,6 +146,7 @@ async def about_help(message: Message):
     )
     await message.reply(about_text, parse_mode="HTML")
 
+
 def compress_image(image_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(image_bytes))
     if img.mode in ("RGBA", "P"):
@@ -159,6 +155,7 @@ def compress_image(image_bytes: bytes) -> bytes:
     output = io.BytesIO()
     img.save(output, format="JPEG", quality=85)
     return output.getvalue()
+
 
 async def user_settings(message: Message):
     db = message.bot.get('db')
@@ -175,7 +172,7 @@ async def user_settings(message: Message):
     )
 
     await message.reply("⚙️ <b>Налаштування профілю</b>\n\nЩо саме ви бажаєте змінити?",
-                         reply_markup=keyboard, parse_mode="HTML")
+                        reply_markup=keyboard, parse_mode="HTML")
 
 
 async def cancel_handler(message: Message, state: FSMContext):
@@ -197,12 +194,10 @@ async def cancel_handler(message: Message, state: FSMContext):
 
 
 async def show_stats_menu(message: Message):
-    """Викликається при натисканні на '📊 Статистика' в головному меню"""
     await message.reply("Оберіть період для перегляду статистики:", reply_markup=get_stats_menu_kb())
 
 
 async def process_stats(message: Message):
-    """Обробляє вибір конкретного періоду (сьогодні/тиждень/місяць)"""
     db = message.bot.get('db')
 
     days = 1
@@ -289,7 +284,7 @@ async def user_profile(message: Message):
         f"📍 Ціль: <b>{user.get('goal', 'Не вказано')}</b>\n"
         f"📏 Зріст: <b>{height} см</b>\n"
         f"⚖️ Вага: <b>{weight} кг</b> (Ціль: {user.get('target_weight', '—')} кг)\n"
-        f"📊 ІМТ: <b>{bmi_value}</b> ({bmi_category})\n"  # НОВИЙ РЯДОК
+        f"📊 ІМТ: <b>{bmi_value}</b> ({bmi_category})\n"
         f"🏃 Активність: <b>{activity_text}</b>\n"
         f"🍎 Денна норма: <b>{user.get('daily_kcal_limit', 0)} ккал</b>\n"
         f"💰 Бюджет: <b>{user.get('daily_budget', 0)} грн/день</b>\n"
@@ -351,7 +346,7 @@ async def set_current_weight(message: Message, state: FSMContext):
             return await message.reply("Вкажіть реальну вагу від 30 до 300 кг.")
     except ValueError:
         if "Пропустити" in message.text:
-            weight = 70 # Дефолтне значення, якщо пропустили
+            weight = 70  # Дефолтне значення, якщо пропустили
         else:
             return await message.reply("Будь ласка, введіть число (наприклад: 75).")
 
@@ -373,6 +368,7 @@ async def set_activity(message: Message, state: FSMContext):
 
     await message.reply("Яка ваша ціль?", reply_markup=get_goal_kb())
     await RegistrationStates.waiting_for_goal.set()
+
 
 async def set_target_weight(message: Message, state: FSMContext):
     text = message.text.replace(',', '.').strip()
@@ -408,34 +404,27 @@ async def set_budget(message: Message, state: FSMContext):
     if not (50 <= new_budget <= 10000):
         return await message.reply("Введіть реальну суму денного бюджету (від 50 до 10 000 грн).")
 
-    # 1. Отримуємо дані з FSM (ті, що користувач вводив зараз)
+    # 1. Отримуємо дані з FSM
     data = await state.get_data()
 
-    # 2. Отримуємо поточні дані з бази (якщо користувач вже існує)
+    # 2. Отримуємо поточні дані з бази
     user_row = await db.get_user(user_id)
     user_db = dict(user_row) if user_row else {}
 
-    # 3. Вибираємо дані: пріоритет у того, що в FSM (нові дані),
-    # якщо в FSM порожньо (це було оновлення одного поля) — беремо старі з БД.
     gender = data.get('gender') or user_db.get('gender')
     age = data.get('age') or user_db.get('age')
     weight = data.get('current_weight') or user_db.get('current_weight')
-
-    # НОВІ ПОЛЯ ДЛЯ КБЖВ
     height = data.get('height') or user_db.get('height', 170)
     activity = data.get('activity') or user_db.get('activity', 1.2)
-
     goal = data.get('goal') or user_db.get('goal')
     target_weight = data.get('target_weight') or user_db.get('target_weight')
 
-    # Якщо немає статі — значить реєстрація зламалася, просимо почати спочатку
     if not gender:
         await message.reply("❌ Виникла помилка. Спробуйте пройти реєстрацію заново /start.")
         await state.finish()
         return
 
-    # 4. Зберігаємо оновлені дані в БД.
-    # Оскільки в add_user ми додали height та activity, передаємо їх сюди.
+    # 4. Зберігаємо оновлені дані в БД
     await db.add_user(
         user_id=user_id,
         gender=gender,
@@ -448,12 +437,9 @@ async def set_budget(message: Message, state: FSMContext):
         budget=new_budget
     )
 
-    # Завершуємо стан FSM
     await state.finish()
 
-    # Повідомлення залежить від того, чи був користувач у базі раніше
     if user_row:
-        # Розраховуємо залишок калорій для виводу (якщо хочеш додати в повідомлення)
         await message.reply(
             f"✅ <b>Дані оновлено!</b>\n"
             f"Новий бюджет: {new_budget} грн/день.\n"
@@ -471,21 +457,13 @@ async def set_budget(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
+
 # --- Аналіз фото та тексту ---
-
-
 async def user_send_photo(message: Message, config: Config):
     db = message.bot.get('db')
     user_data = await db.get_user(message.from_user.id)
     if not user_data: return
     user = dict(user_data)
-
-    if not check_premium(user):
-        return await message.reply(
-            "💎 Аналіз по фото — це функція <b>Premium</b>.\n"
-            "Будь ласка, опишіть їжу текстом або активуйте подписку.",
-            parse_mode="HTML"
-        )
 
     user_context = (
         f"Користувач: {user.get('gender')}, {user.get('age')} років. "
@@ -503,7 +481,6 @@ async def user_send_photo(message: Message, config: Config):
         await photo.download(destination_file=file_in_io)
         image_bytes = file_in_io.getvalue()
 
-        # Твій оригінальний промпт
         prompt = (
             "Роль: Ти — професійний дієтолог. Твоя відповідь має бути чистою, БЕЗ символів ** для виділення.\n"
             "Завдання: Проаналізуй фото. Надай стислий звіт українською.\n"
@@ -532,7 +509,6 @@ async def user_send_photo(message: Message, config: Config):
             dish, kcal, p, f, c = match.group(1).strip(), int(match.group(2)), float(match.group(3)), \
                 float(match.group(4)), float(match.group(5))
 
-            # Зберігаємо в БД як непідтверджене
             meal_id = await db.add_meal(message.from_user.id, kcal, p, f, c, dish, confirmed=0)
 
             clean_text = response.split("DATA:")[0].strip()
@@ -546,7 +522,7 @@ async def user_send_photo(message: Message, config: Config):
             await processing_msg.delete()
             await message.reply(clean_text, reply_markup=kb, parse_mode="HTML")
         else:
-            await processing_msg.edit_text(response)  # Виправлено edit -> edit_text
+            await processing_msg.edit_text(response)
     except Exception as e:
         print(f"Error in user_send_photo: {e}")
         await processing_msg.edit_text("⚠️ Не вдалося проаналізувати фото.")
@@ -561,7 +537,6 @@ async def user_text_advice(message: Message, config: Config):
     processing_msg = await message.reply("⏳ Обробляю...")
     stats = await db.get_stats_for_period(message.from_user.id, 1)
 
-    # Твій оригінальний промпт
     prompt = (
         "Роль: Професійний дієтолог. Пиши українською, БЕЗ символів **.\n"
         f"Контекст: вага {user['current_weight']}, ціль {user['goal']}, норма {user['daily_kcal_limit']} ккал.\n"
@@ -584,7 +559,6 @@ async def user_text_advice(message: Message, config: Config):
             dish, kcal, p, f, c = match.group(1).strip(), int(match.group(2)), float(match.group(3)), \
                 float(match.group(4)), float(match.group(5))
 
-            # Зберігаємо як непідтверджене
             meal_id = await db.add_meal(message.from_user.id, kcal, p, f, c, dish, confirmed=0)
 
             clean_text = response.split("DATA:")[0].strip()
@@ -634,19 +608,15 @@ async def toggle_notifications(callback_query: CallbackQuery):
         return await callback_query.answer("Користувача не знайдено.")
 
     setting = "morning_motivation" if callback_query.data == "toggle_morning" else "evening_motivation"
-    # Інвертуємо значення: якщо було 1, стане 0, і навпаки
     new_value = 0 if user[setting] else 1
 
     await db.update_notification_setting(user_id, setting, new_value)
 
-    # Оновлюємо профіль прямо в тому ж повідомленні
     await user_profile(callback_query)
     await callback_query.answer("Оновлено!")
 
 
 async def process_open_settings(callback_query: CallbackQuery):
-    """Викликає меню налаштувань профілю"""
-    # Ми викликаємо існуючу функцію user_settings
     await user_settings(callback_query.message)
     await callback_query.answer()
 
@@ -666,7 +636,6 @@ async def edit_single_weight(message: Message, state: FSMContext):
     user_id = message.from_user.id
     user = dict(await db.get_user(user_id))
 
-    # Зберігаємо всі старі дані, замінюємо лише вагу
     await db.add_user(
         user_id=user_id, gender=user['gender'], age=user['age'],
         weight=new_weight, height=user['height'], activity=user['activity'],
@@ -719,64 +688,86 @@ async def edit_single_budget(message: Message, state: FSMContext):
     await message.reply("✅ <b>Денний бюджет оновлено!</b>", reply_markup=get_main_menu_kb(), parse_mode="HTML")
     await user_profile(message)
 
+
+async def no_premium_photo(message: Message):
+    await message.reply(
+        "💎 Аналіз по фото — це функція <b>Premium</b>.\n"
+        "Будь ласка, опишіть їжу текстом або активуйте підписку /premium.",
+        parse_mode="HTML"
+    )
+
+
 def register_user(dp: Dispatcher):
-    # Список кнопок, які не повинні сприйматися як текстовий запит до Gemini
     main_menu_buttons = [
         "📊 Статистика", "📊 Статистика за сьогодні", "📊 Статистика за тиждень",
         "📊 Статистика за місяць", "👤 Мій профіль", "💎 Premium", "❓ Допомога",
         "Скасувати ❌", "Пропустити ➡️", "⬅️ Назад", "Мій профіль", "Допомога"
     ]
 
-
-
     # --- 1. СКАСУВАННЯ (Найвищий пріоритет) ---
-    dp.register_message_handler(cancel_handler, commands=["cancel"], state="*")
-    dp.register_message_handler(cancel_handler, lambda m: "Скасувати" in m.text, state="*")
+    dp.register_message_handler(cancel_handler, commands=["cancel"], state="*", is_private=True)
+    dp.register_message_handler(cancel_handler, lambda m: "Скасувати" in m.text, state="*", is_private=True)
 
     # --- 2. ГОЛОВНЕ МЕНЮ ТА КОМАНДИ ---
-    dp.register_message_handler(user_start, commands=["start"], state="*")
-    dp.register_message_handler(user_start, text="⬅️ Назад", state="*")
+    dp.register_message_handler(user_start, commands=["start"], state="*", is_private=True)
+    dp.register_message_handler(user_start, text="⬅️ Назад", state="*", is_private=True)
 
-    dp.register_message_handler(user_profile, lambda m: "Мій профіль" in m.text, state="*")
-    dp.register_message_handler(user_profile, commands=["profile"], state="*")
+    dp.register_message_handler(user_profile, lambda m: "Мій профіль" in m.text, state="*", is_private=True,
+                                is_registered=True)
+    dp.register_message_handler(user_profile, commands=["profile"], state="*", is_private=True, is_registered=True)
 
-    dp.register_message_handler(show_stats_menu, text="📊 Статистика", state="*")
-    dp.register_message_handler(process_stats, lambda m: "Статистика за" in m.text, state="*")
-    dp.register_message_handler(user_help, text="❓ Допомога", state="*")
-    dp.register_message_handler(about_help, text="💎 Premium", state="*")
-    dp.register_message_handler(user_settings, commands=["settings", "change"], state="*")
+    dp.register_message_handler(show_stats_menu, text="📊 Статистика", state="*", is_private=True, is_registered=True)
+    dp.register_message_handler(show_stats_menu, commands=["stats"], state="*", is_private=True, is_registered=True)
+    dp.register_message_handler(process_stats, lambda m: "Статистика за" in m.text, state="*", is_private=True,
+                                is_registered=True)
+
+    dp.register_message_handler(user_help, text="❓ Допомога", state="*", is_private=True)
+    dp.register_message_handler(user_help, commands=["help"], state="*", is_private=True, is_registered=True)
+    dp.register_message_handler(about_help, text="💎 Premium", state="*", is_private=True)
+    dp.register_message_handler(user_settings, commands=["settings", "change"], state="*", is_private=True,
+                                is_registered=True)
 
     # --- 3. CALLBACKS ---
-    # Обробка кнопок підтвердження їжі (action=save/cancel)
-    dp.register_callback_query_handler(process_meal_confirmation, meal_cb.filter(), state="*")
-
-    # Налаштування та сповіщення
+    dp.register_callback_query_handler(process_meal_confirmation, meal_cb.filter(), state="*", is_registered=True)
     dp.register_callback_query_handler(process_settings_change,
                                        lambda c: c.data in ["change_goal", "change_weight", "change_budget",
-                                                            "full_reset"],
-                                       state="*")
-    dp.register_callback_query_handler(process_open_settings, lambda c: c.data == "open_settings", state="*")
+                                                            "full_reset"], state="*", is_registered=True)
+    dp.register_callback_query_handler(process_open_settings, lambda c: c.data == "open_settings", state="*",
+                                       is_registered=True)
     dp.register_callback_query_handler(toggle_notifications, lambda c: c.data in ["toggle_morning", "toggle_evening"],
-                                       state="*")
-    dp.register_callback_query_handler(process_referral_menu, lambda c: c.data == "referral_menu", state="*")
+                                       state="*", is_registered=True)
+    dp.register_callback_query_handler(process_referral_menu, lambda c: c.data == "referral_menu", state="*",
+                                       is_registered=True)
 
     # --- 4. КРОКИ РЕЄСТРАЦІЇ (FSM) ---
-    dp.register_message_handler(set_gender, state=RegistrationStates.waiting_for_gender)
-    dp.register_message_handler(set_age, state=RegistrationStates.waiting_for_age)
-    dp.register_message_handler(set_height, state=RegistrationStates.waiting_for_height)
-    dp.register_message_handler(set_current_weight, state=RegistrationStates.waiting_for_current_weight)
-    dp.register_message_handler(set_activity, state=RegistrationStates.waiting_for_activity)
-    dp.register_message_handler(set_goal, state=RegistrationStates.waiting_for_goal)
-    dp.register_message_handler(set_target_weight, state=RegistrationStates.waiting_for_target_weight)
-    dp.register_message_handler(set_budget, state=RegistrationStates.waiting_for_budget)
-    dp.register_message_handler(edit_single_weight, state=EditProfileStates.waiting_for_new_weight)
-    dp.register_message_handler(edit_single_goal, state=EditProfileStates.waiting_for_new_goal)
-    dp.register_message_handler(edit_single_budget, state=EditProfileStates.waiting_for_new_budget)
+    dp.register_message_handler(set_gender, state=RegistrationStates.waiting_for_gender, is_private=True)
+    dp.register_message_handler(set_age, state=RegistrationStates.waiting_for_age, is_private=True)
+    dp.register_message_handler(set_height, state=RegistrationStates.waiting_for_height, is_private=True)
+    dp.register_message_handler(set_current_weight, state=RegistrationStates.waiting_for_current_weight,
+                                is_private=True)
+    dp.register_message_handler(set_activity, state=RegistrationStates.waiting_for_activity, is_private=True)
+    dp.register_message_handler(set_goal, state=RegistrationStates.waiting_for_goal, is_private=True)
+    dp.register_message_handler(set_target_weight, state=RegistrationStates.waiting_for_target_weight, is_private=True)
+    dp.register_message_handler(set_budget, state=RegistrationStates.waiting_for_budget, is_private=True)
+    dp.register_message_handler(edit_single_weight, state=EditProfileStates.waiting_for_new_weight, is_private=True,
+                                is_registered=True)
+    dp.register_message_handler(edit_single_goal, state=EditProfileStates.waiting_for_new_goal, is_private=True,
+                                is_registered=True)
+    dp.register_message_handler(edit_single_budget, state=EditProfileStates.waiting_for_new_budget, is_private=True,
+                                is_registered=True)
 
     # --- 5. КОНТЕНТ (АНАЛІЗ) ---
-    dp.register_message_handler(user_send_photo, content_types=ContentType.PHOTO, state="*")
+    # Обробка фото з преміумом
+    dp.register_message_handler(user_send_photo, content_types=ContentType.PHOTO, state="*", is_private=True,
+                                is_registered=True, is_premium=True)
+    # Обробка фото без преміуму
+    dp.register_message_handler(no_premium_photo, content_types=ContentType.PHOTO, state="*", is_private=True,
+                                is_registered=True, is_premium=False)
+
     dp.register_message_handler(
         user_text_advice,
         lambda m: m.text not in main_menu_buttons and not m.text.startswith('/'),
-        state="*"
+        state="*",
+        is_private=True,
+        is_registered=True
     )
