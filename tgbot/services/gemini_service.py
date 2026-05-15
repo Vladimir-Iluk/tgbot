@@ -6,20 +6,12 @@ from tgbot.misc.helpers import retry_on_error
 
 logger = logging.getLogger(__name__)
 
-# Використовуємо стабільну та актуальну модель 2.5-flash
-# Це виправить помилку 404, яку ми бачили в логах
 GEMINI_MODEL = "gemini-2.5-flash"
 
 @retry_on_error(retries=3, delay=2)
 async def send_photo_to_gemini(photo_bytes: bytes, api_key: str, prompt: str) -> str:
-    """
-    Відправляє фото та текст до Gemini для аналізу складу страви.
-    """
     try:
-        # Ініціалізація клієнта без додаткових опцій версій
         client = genai.Client(api_key=api_key)
-
-        # Виконуємо запит у окремому потоці, щоб не блокувати асинхронний цикл бота
         response = await asyncio.to_thread(
             client.models.generate_content,
             model=GEMINI_MODEL,
@@ -34,7 +26,6 @@ async def send_photo_to_gemini(photo_bytes: bytes, api_key: str, prompt: str) ->
         return response.text
     except Exception as e:
         logger.error(f"Error in Gemini Photo API ({GEMINI_MODEL}): {e}")
-        # Спроба діагностики, якщо знову виникне помилка з моделлю
         try:
             models = client.models.list()
             logger.info(f"Available models for this key: {[m.name for m in models]}")
